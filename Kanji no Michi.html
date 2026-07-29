@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>漢字の道 — JLPT N3 Kanji Flashcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;800&family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="waves"></div>
+<div id="app"></div>
+
+<script src="data.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- DATA ---------------- */
+  /* Data loaded from data.js */
+
+  /* Load user-added kanji from localStorage */
+  function loadUserKanji() {
+    const stored = localStorage.getItem('userKanji');
+    if (stored) {
+      try {
+        const userData = JSON.parse(stored);
+        userData.forEach(item => {
+          const cat = byId(item.catId);
+          if (cat) {
+            cat.words.push(item.word);
+          }
+        });
+      } catch (e) {
+        console.error('Error loading user kanji:', e);
+      }
+    }
+  }
+
+  function saveUserKanji(catId, word) {
+    const stored = localStorage.getItem('userKanji') || '[]';
+    let userData = [];
+    try {
+      userData = JSON.parse(stored);
+    } catch (e) {
+      userData = [];
+    }
+    userData.push({ catId, word });
+    localStorage.setItem('userKanji', JSON.stringify(userData));
+  }
+
+  function addKanjiToCategory(catId, kanji, hiragana, meaning) {
+    const cat = byId(catId);
+    if (!cat) return false;
+    const newWord = { k: kanji, h: hiragana, m: meaning };
+    cat.words.push(newWord);
+    saveUserKanji(catId, newWord);
+    return true;
+  }
+
+  loadUserKanji();
+
+  /* ---------------- STATE (per flashcard session) ---------------- */
+  let flashState = { catId:null, order:[], index:0, flipped:false };
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  function startFlash(catId, doShuffle){
+    const cat = byId(catId);
+    const idxs = cat.words.map((_,i)=>i);
+    flashState = { catId, order: doShuffle ? shuffle(idxs) : idxs, index:0, flipped:false };
+  }
+
+  /* ---------------- ROUTER ---------------- */
+  function parseHash(){
+    const h = location.hash.replace(/^#\/?/, "");
+    const parts = h.split("/").filter(Boolean);
+    return parts;
+  }
+
+  function navigate(hash){
+    location.hash = hash;
+  }
+
+  window.addEventListener("hashchange", render);
+  window.addEventListener("DOMContentLoaded", render);
+
+  /* ---------------- ICONS ---------------- */
+  const ICON_ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+  /* ---------------- LEAVES + SCENE (landing only) ---------------- */
+  const LEAF_SVG = '<svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 2 C 8 8 4 18 16 30 C 28 18 24 8 16 2 Z"/><path d="M16 6 L16 26 M16 13 L11 9 M16 18 L21 22" stroke="rgba(0,0,0,0.28)" stroke-width="1.3" fill="none"/></svg>';
+
+  const LEAF_CONFIG = [
+    {left:4,  delay:0,   dur:11,   drift:40,  size:17, tone:"a"},
+    {left:14, delay:2.5, dur:9,    drift:-30, size:20, tone:"b"},
+    {left:23, delay:5,   dur:13,   drift:50,  size:14, tone:"c"},
+    {left:33, delay:1,   dur:10,   drift:-45, size:18, tone:"a"},
+    {left:44, delay:4,   dur:12,   drift:35,  size:16, tone:"b"},
+    {left:55, delay:6.5, dur:9.5,  drift:-25, size:20, tone:"c"},
+    {left:65, delay:2,   dur:11.5, drift:40,  size:15, tone:"a"},
+    {left:74, delay:8,   dur:10,   drift:-35, size:18, tone:"b"},
+    {left:83, delay:3.5, dur:13.5, drift:30,  size:16, tone:"c"},
+    {left:91, delay:7,   dur:9,    drift:-40, size:19, tone:"a"},
+    {left:9,  delay:9.5, dur:12.5, drift:25,  size:14, tone:"b"},
+    {left:60, delay:0.8, dur:10.5, drift:-30, size:17, tone:"c"},
+  ];
+
+  function renderLeaves(){
+    const leaves = LEAF_CONFIG.map(cfg => `
+      <div class="leaf tone-${cfg.tone}" style="--left:${cfg.left}%; --delay:${cfg.delay}s; --dur:${cfg.dur}s; --drift:${cfg.drift}px; --size:${cfg.size}px;">
+        ${LEAF_SVG}
+      </div>`).join("");
+    return `<div class="leaves" aria-hidden="true">${leaves}</div>`;
+  }
+
+  function renderHeroScene(){
+    return `
+      <div class="hero-scene" aria-hidden="true">
+        <svg viewBox="0 0 800 260" preserveAspectRatio="xMidYMax slice">
+          <defs>
+            <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+              <!-- warmer sunrise palette -->
+              <stop offset="0%" stop-color="#3B1E2B"/>
+              <stop offset="38%" stop-color="#7C3A39"/>
+              <stop offset="65%" stop-color="#C1633B"/>
+              <stop offset="100%" stop-color="#F6B258"/>
+            </linearGradient>
+            <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#FCEAC0" stop-opacity="0.9"/>
+              <stop offset="60%" stop-color="#F0964B" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#F0964B" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect x="0" y="0" width="800" height="260" fill="url(#skyGrad)"/>
+          <circle cx="400" cy="95" r="90" fill="url(#sunGlow)"/>
+          <circle cx="400" cy="95" r="42" fill="var(--sun)"/>
+          <path d="M150,230 L300,90 L340,120 L400,50 L460,120 L500,90 L650,230 Z" fill="var(--fuji)" opacity="0.92"/>
+          <path d="M400,50 L424,84 L408,80 L400,96 L392,80 L376,84 Z" fill="var(--fuji-snow)" opacity="0.9"/>
+          <rect x="0" y="222" width="800" height="38" fill="#141C2B"/>
+          <rect x="372" y="150" width="13" height="80" fill="#8C2E1E"/>
+          <rect x="415" y="150" width="13" height="80" fill="#8C2E1E"/>
+          <rect x="358" y="140" width="84" height="11" rx="2" fill="var(--shu)"/>
+          <rect x="365" y="156" width="70" height="9" rx="2" fill="#8C2E1E"/>
+          <rect x="378" y="182" width="44" height="7" fill="#6E2417"/>
+        </svg>
+      </div>`;
+  }
+
+  /* ---------------- RENDER ---------------- */
+  function render(){
+    const parts = parseHash();
+    const app = document.getElementById("app");
+
+    if(parts.length === 0){
+      app.innerHTML = renderLanding();
+      bindLanding();
+      return;
+    }
+    if(parts[0] === "vocabulary"){
+      app.innerHTML = renderVocabPlaceholder();
+      bindTopNav();
+      return;
+    }
+    if(parts[0] === "kanji" && parts.length === 1){
+      app.innerHTML = renderCategoryGrid();
+      bindTopNav();
+      bindCategoryGrid();
+      return;
+    }
+    if(parts[0] === "kanji" && parts.length >= 2){
+      const cat = byId(parts[1]);
+      if(!cat){ navigate(""); return; }
+      const mode = parts[2] === "cards" ? "cards" : "list";
+      if(mode === "cards" && cat.words.length > 0){
+        startFlash(cat.id, true);
+      }
+      app.innerHTML = renderCategoryDetail(cat, mode);
+      bindTopNav();
+      bindCategoryDetail(cat, mode);
+      return;
+    }
+    navigate("");
+  }
+
+  /* ---- topbar / breadcrumb shared ---- */
+  function topbar(crumbHtml){
+    return `
+      <div class="topbar wrap">
+        <a class="brand" href="#/" data-nav="">
+          <span class="stamp-mini">道</span>
+          漢字の道
+        </a>
+        <div class="breadcrumb">${crumbHtml}</div>
+      </div>`;
+  }
+
+  function bindTopNav(){
+    document.querySelectorAll("[data-nav]").forEach(el=>{
+      el.addEventListener("click", e=>{
+        e.preventDefault();
+        navigate(el.getAttribute("data-nav"));
+      });
+    });
+  }
+
+  /* ---------------- LANDING ---------------- */
+  function renderLanding(){
+    return `
+      <div class="content">
+        ${renderLeaves()}
+        ${topbar(`<span class="current">はじめに</span>`)}
+        <div class="landing-hero wrap">
+          <div class="enso-wrap" aria-hidden="true">
+            <svg viewBox="0 0 200 200">
+              <path class="enso-path" d="M100,20 C 150,22 178,60 176,102 C 174,146 138,180 96,178 C 54,176 22,142 24,98 C 26,58 56,26 96,22" />
+            </svg>
+          </div>
+          <div class="hero-inner">
+            <span class="eyebrow">Learn at your own pace</span>
+            <h1 class="hero-title">漢字の道</h1>
+            <span class="level-tag">JLPT N3 level</span>
+            <p class="hero-sub">Kanji no Michi — "the way of kanji." Built for JLPT N3 study: work through characters and words in small, focused sets, one card at a time.</p>
+          </div>
+          ${renderHeroScene()}
+        </div>
+
+        <div class="choice-row wrap">
+          <a class="choice-card" href="#/kanji" data-nav="kanji" tabindex="0">
+            <span class="ghost-kanji">漢</span>
+            <span class="kanji-big">漢字</span>
+            <span class="en-label">Kanji</span>
+            <span class="desc">Study characters by category — verbs, adjectives, daily life and more.</span>
+            <span class="go">Begin ${ICON_ARROW}</span>
+          </a>
+          <a class="choice-card" href="#/vocabulary" data-nav="vocabulary" tabindex="0">
+            <span class="ghost-kanji">語</span>
+            <span class="kanji-big">単語</span>
+            <span class="en-label">Vocabulary</span>
+            <span class="desc">Broader word sets beyond single kanji — phrases, expressions and usage.</span>
+            <span class="go">Begin ${ICON_ARROW}</span>
+          </a>
+        </div>
+
+        <div class="landing-footer">静かに、一歩ずつ — quietly, one step at a time</div>
+      </div>`;
+  }
+
+  function bindLanding(){
+    bindTopNav();
+  }
+
+  /* ---------------- VOCAB PLACEHOLDER ---------------- */
+  function renderVocabPlaceholder(){
+    return `
+      <div class="content">
+        ${topbar(`<button data-nav="" >漢字の道</button><span class="sep">/</span><span class="current">単語</span>`)}
+        <div class="empty-state">
+          <div class="glyph">語</div>
+          <h2>Vocabulary is on its way</h2>
+          <p>This section will hold broader vocabulary sets. For now, head into the Kanji section to start studying.</p>
+          <div style="margin-top:24px;">
+            <a href="#/kanji" data-nav="kanji" class="choice-card" style="display:inline-block; width:auto; padding:12px 22px;">
+              <span class="go" style="position:static;">Go to Kanji ${ICON_ARROW}</span>
+            </a>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* ---------------- CATEGORY GRID ---------------- */
+  function renderCategoryGrid(){
+    const cards = CATEGORIES.map(c=>{
+      const disabled = c.words.length === 0;
+      return `
+        <div class="cat-card ${disabled ? "disabled" : "active-card"}" ${disabled ? "" : `data-cat="${c.id}" tabindex="0" role="button"`}>
+          <span class="ghost-kanji">${c.glyph}</span>
+          <div>
+            <div class="cat-jp">${c.jp}</div>
+            <div class="cat-en">${c.en}</div>
+          </div>
+          <div class="cat-meta">
+            <span class="count-badge ${disabled ? "empty" : ""}">${disabled ? "Coming soon" : c.words.length + " words"}</span>
+            ${disabled ? "" : `<span class="arrow-hint">${ICON_ARROW}</span>`}
+          </div>
+        </div>`;
+    }).join("");
+
+    return `
+      <div class="content">
+        ${topbar(`<button data-nav="">漢字の道</button><span class="sep">/</span><span class="current">漢字</span>`)}
+        <div class="section-header wrap">
+          <h1>Choose a category</h1>
+          <p>Pick a set of kanji to study as a list or with flashcards.</p>
+        </div>
+        <div class="cat-grid wrap">${cards}</div>
+      </div>`;
+  }
+
+  function bindCategoryGrid(){
+    document.querySelectorAll(".cat-card[data-cat]").forEach(el=>{
+      const go = ()=> navigate(`kanji/${el.getAttribute("data-cat")}`);
+      el.addEventListener("click", go);
+      el.addEventListener("keydown", e=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); go(); }});
+    });
+  }
+
+  /* ---------------- CATEGORY DETAIL ---------------- */
+  function renderCategoryDetail(cat, mode){
+    const crumb = `
+      <button data-nav="">漢字の道</button><span class="sep">/</span>
+      <button data-nav="kanji">漢字</button><span class="sep">/</span>
+      <span class="current">${cat.jp}</span>`;
+
+    const header = `
+      <div class="detail-header wrap">
+        <div class="cat-jp-big">${cat.jp}</div>
+        <h1>${cat.en}</h1>
+        <div class="count-line">${cat.words.length} word${cat.words.length===1?"":"s"} in this set</div>
+      </div>`;
+
+    if(cat.words.length === 0){
+      return `
+        <div class="content">
+          ${topbar(crumb)}
+          ${header}
+          <div class="empty-state">
+            <div class="glyph">${cat.glyph}</div>
+            <h2>No words yet</h2>
+            <p>This category is empty for now — more kanji are on the way. Try another category in the meantime.</p>
+          </div>
+        </div>`;
+    }
+
+    const toggle = `
+      <div class="mode-toggle">
+        <button data-mode="list" class="${mode==="list"?"active":""}">List</button>
+        <button data-mode="cards" class="${mode==="cards"?"active":""}">Flashcards</button>
+      </div>`;
+
+    const body = mode === "list" ? renderListView(cat) : renderFlashView(cat);
+
+    return `
+      <div class="content">
+        ${topbar(crumb)}
+        ${header}
+        ${toggle}
+        ${body}
+      </div>`;
+  }
+
+  function renderListView(cat){
+    const rows = cat.words.map((w,i)=>`
+      <div class="row">
+        <div class="k">${w.k}</div>
+        <div class="mid">
+          <div class="hira">${w.h}</div>
+          <div class="meaning">${w.m}</div>
+        </div>
+        <div class="idx">${String(i+1).padStart(2,"0")}</div>
+      </div>`).join("");
+    
+    const addForm = `
+      <div class="add-kanji-form">
+        <div style="margin-top:20px; padding-top:20px; border-top:1px solid rgba(199,161,67,0.2);">
+          <h3 style="font-size:14px; color:var(--washi-soft); margin:0 0 16px; font-weight:600;">Add your own kanji</h3>
+          <div style="display:grid; grid-template-columns:1fr 1fr 2fr auto; gap:10px; align-items:flex-end;">
+            <input type="text" id="addKanji" placeholder="Kanji" maxlength="10" style="padding:8px; border-radius:6px; border:1px solid rgba(199,161,67,0.3); background:rgba(42,53,72,0.5); color:var(--washi-soft); font-family:'Shippori Mincho',serif; font-size:16px;" />
+            <input type="text" id="addHira" placeholder="Hiragana" maxlength="20" style="padding:8px; border-radius:6px; border:1px solid rgba(199,161,67,0.3); background:rgba(42,53,72,0.5); color:var(--washi-soft); font-size:13px;" />
+            <input type="text" id="addMeaning" placeholder="Meaning" maxlength="50" style="padding:8px; border-radius:6px; border:1px solid rgba(199,161,67,0.3); background:rgba(42,53,72,0.5); color:var(--washi-soft); font-size:13px;" />
+            <button id="submitKanji" style="padding:8px 16px; background:var(--shu); color:var(--washi-soft); border:none; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer;">Add</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    return `<div class="kanji-list wrap">${rows}</div>${addForm}`;
+  }
+
+  function renderFlashView(cat){
+    if(flashState.catId !== cat.id || !flashState.order || flashState.order.length !== cat.words.length){
+      startFlash(cat.id, true);
+    }
+    const total = flashState.order.length;
+    const pos = flashState.index;
+    const word = cat.words[flashState.order[pos]];
+
+    return `
+      <div class="flash-stage wrap">
+        <div class="flash-controls-top">
+          <span class="counter-pill">${pos+1} / ${total}</span>
+          <button class="icon-btn" id="shuffleBtn" title="Shuffle" aria-label="Shuffle cards">⤨</button>
+          <button class="icon-btn" id="resetBtn" title="Reset order" aria-label="Reset order">↺</button>
+        </div>
+
+        <div class="flip-card ${flashState.flipped ? "flipped":""}" id="flipCard">
+          <div class="flip-card-inner">
+            <div class="face face-front">
+              <div class="kbig">${word.k}</div>
+              <div class="hint">Tap to reveal</div>
+            </div>
+            <div class="face face-back">
+              <div class="hira-big">${word.h}</div>
+              <div class="meaning-line">(${word.m})
+                <span class="kanji-mini">${word.k}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flash-nav">
+          <button class="nav-btn" id="prevBtn" ${pos===0?"disabled":""} aria-label="Previous card">‹</button>
+          <button class="nav-btn" id="nextBtn" ${pos===total-1?"disabled":""} aria-label="Next card">›</button>
+        </div>
+      </div>`;
+  }
+
+  function bindCategoryDetail(cat, mode){
+    document.querySelectorAll(".mode-toggle button").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const m = btn.getAttribute("data-mode");
+        const target = `kanji/${cat.id}/${m}`;
+        const current = parseHash().join("/");
+        if(current === target){
+          if(m === "cards" && cat.words.length > 0) startFlash(cat.id, true);
+          rerenderDetail(cat, m);
+        } else {
+          navigate(target);
+        }
+      });
+    });
+
+    // Handle add kanji form submission
+    const submitBtn = document.getElementById("submitKanji");
+    if(submitBtn){
+      submitBtn.addEventListener("click", ()=>{
+        const kanjiInput = document.getElementById("addKanji");
+        const hiraInput = document.getElementById("addHira");
+        const meaningInput = document.getElementById("addMeaning");
+        
+        if(kanjiInput && hiraInput && meaningInput){
+          const kanji = kanjiInput.value.trim();
+          const hiragana = hiraInput.value.trim();
+          const meaning = meaningInput.value.trim();
+          
+          if(kanji && hiragana && meaning){
+            addKanjiToCategory(cat.id, kanji, hiragana, meaning);
+            kanjiInput.value = "";
+            hiraInput.value = "";
+            meaningInput.value = "";
+            rerenderDetail(cat, mode);
+          }
+        }
+      });
+    }
+
+    if(mode !== "cards" || cat.words.length === 0) return;
+
+    const flipCard = document.getElementById("flipCard");
+    if(flipCard){
+      const doFlip = ()=>{
+        flashState.flipped = !flashState.flipped;
+        flipCard.classList.toggle("flipped", flashState.flipped);
+      };
+      flipCard.addEventListener("click", doFlip);
+      flipCard.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); doFlip(); }});
+      flipCard.setAttribute("tabindex","0");
+      flipCard.setAttribute("role","button");
+      flipCard.setAttribute("aria-label","Flashcard, tap to reveal reading and meaning");
+    }
+
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    if(prevBtn) prevBtn.addEventListener("click", ()=>{
+      if(flashState.index > 0){ flashState.index--; flashState.flipped=false; rerenderDetail(cat,"cards"); }
+    });
+    if(nextBtn) nextBtn.addEventListener("click", ()=>{
+      if(flashState.index < flashState.order.length-1){ flashState.index++; flashState.flipped=false; rerenderDetail(cat,"cards"); }
+    });
+
+    const shuffleBtn = document.getElementById("shuffleBtn");
+    if(shuffleBtn) shuffleBtn.addEventListener("click", ()=>{
+      startFlash(cat.id, true);
+      rerenderDetail(cat,"cards");
+    });
+    const resetBtn = document.getElementById("resetBtn");
+    if(resetBtn) resetBtn.addEventListener("click", ()=>{
+      startFlash(cat.id, false);
+      rerenderDetail(cat,"cards");
+    });
+  }
+
+  function rerenderDetail(cat, mode){
+    const app = document.getElementById("app");
+    app.innerHTML = renderCategoryDetail(cat, mode);
+    bindTopNav();
+    bindCategoryDetail(cat, mode);
+  }
+
+})();
+</script>
+</body>
+</html>

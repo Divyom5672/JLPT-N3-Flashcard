@@ -1,0 +1,433 @@
+:root{
+  --indigo-deep:#16233A;
+  --indigo-mid:#22384F;
+  --indigo-soft:#2E4863;
+  --washi:#F2E8D6;
+  --washi-soft:#FAF4E6;
+  --shu:#B7452F;
+  --shu-dark:#963823;
+  --gold:#C7A143;
+  --sumi:#1C1B18;
+  --ink-soft:#5B564C;
+  --line:rgba(199,161,67,0.35);
+  --shadow: 0 18px 40px rgba(10,16,28,0.35);
+  --radius: 14px;
+  --sun:#F6C177;
+  --fuji:#2A3548;
+  --fuji-snow:#F5E6D8;
+  --leaf-a:#C1502F;
+  --leaf-b:#D98B3F;
+  --leaf-c:#C9A227;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--indigo-deep);
+  color:var(--washi-soft);
+  font-family:'Noto Sans JP', sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+#app{min-height:100vh; position:relative; overflow-x:hidden;}
+
+h1,h2,h3, .jp-display{
+  font-family:'Shippori Mincho', serif;
+}
+
+a{color:inherit; text-decoration:none;}
+button{font-family:inherit; cursor:pointer;}
+
+/* subtle seigaiha wave texture, fixed to viewport */
+.waves{
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  opacity:0.10;
+  background-image: radial-gradient(circle at 10px 10px, transparent 9px, var(--gold) 9.5px, transparent 10.5px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.15) 70%);
+}
+
+.content{position:relative; z-index:1;}
+
+/* ---------- shared layout bits ---------- */
+.wrap{max-width:1080px; margin:0 auto; padding:0 28px;}
+
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:22px 0 0;
+}
+.brand{
+  display:flex; align-items:baseline; gap:10px;
+  font-family:'Shippori Mincho', serif;
+  font-weight:700; font-size:20px; letter-spacing:0.02em;
+  color:var(--washi-soft);
+}
+.brand .stamp-mini{
+  width:26px; height:26px; border-radius:5px; background:var(--shu);
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:700; color:var(--washi-soft);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+}
+
+.breadcrumb{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  font-size:14px; color:var(--gold); opacity:0.9;
+}
+.breadcrumb .sep{opacity:0.5;}
+.breadcrumb button{
+  background:none; border:none; color:inherit; font-size:14px;
+  padding:2px 4px; border-radius:6px;
+}
+.breadcrumb button:hover{ text-decoration:underline; }
+.breadcrumb .current{color:var(--washi-soft); font-weight:600;}
+
+/* ---------- LANDING ---------- */
+.landing-hero{
+  padding:64px 0 20px;
+  text-align:center;
+  position:relative;
+}
+.landing-hero::before{
+  content:"";
+  position:absolute; top:-70px; left:50%; transform:translateX(-50%);
+  width:900px; height:520px; max-width:140vw;
+  background:radial-gradient(circle, rgba(240,150,75,0.20), rgba(240,150,75,0) 65%);
+  z-index:0; pointer-events:none;
+}
+.enso-wrap{
+  position:absolute; top:-40px; left:50%; transform:translateX(-50%);
+  width:min(560px, 90vw); height:min(560px,90vw);
+  z-index:0; pointer-events:none;
+}
+.enso-wrap svg{width:100%; height:100%;}
+.enso-path{
+  fill:none;
+  stroke:var(--gold);
+  stroke-width:6;
+  stroke-linecap:round;
+  opacity:0.45;
+  stroke-dasharray:1400;
+  stroke-dashoffset:1400;
+  animation: draw-enso 2.4s cubic-bezier(.65,0,.35,1) forwards 0.2s;
+}
+@media (prefers-reduced-motion: reduce){
+  .enso-path{ animation:none; stroke-dashoffset:0; }
+}
+@keyframes draw-enso{ to{ stroke-dashoffset:70; } }
+
+.hero-inner{position:relative; z-index:1;}
+.eyebrow{
+  display:inline-block; font-size:13px; letter-spacing:0.22em; text-transform:uppercase;
+  color:var(--gold); margin-bottom:18px; font-weight:600;
+}
+.hero-title{
+  font-size:clamp(48px, 9vw, 92px);
+  line-height:1;
+  margin:0 0 6px;
+  color:var(--washi-soft);
+  font-weight:700;
+}
+.hero-sub{
+  font-size:clamp(15px,2.4vw,18px);
+  color:var(--washi);
+  opacity:0.75;
+  max-width:480px;
+  margin:14px auto 0;
+  line-height:1.6;
+  font-weight:300;
+}
+.level-tag{
+  display:inline-flex; align-items:center; gap:6px;
+  margin-top:14px;
+  font-size:12.5px; font-weight:700; letter-spacing:0.08em;
+  color:var(--sun);
+  border:1px solid rgba(246,193,119,0.55);
+  background:rgba(246,193,119,0.08);
+  padding:6px 14px; border-radius:100px;
+}
+
+.hero-scene{
+  /* make the scene sit behind the landing content as a full-viewport background */
+  position:fixed;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  max-width:unset; margin:0;
+  border-radius:0; overflow:visible;
+  box-shadow:none; border:0;
+}
+.hero-scene svg{ display:block; width:100vw; height:100vh; }
+
+/* falling leaves overlay, landing page only */
+.leaves{
+  position:fixed; inset:0; z-index:2; overflow:hidden; pointer-events:none;
+}
+.leaf{
+  position:absolute; top:-10%; left:var(--left);
+  width:var(--size); height:var(--size);
+  opacity:0;
+  animation:leaf-fall var(--dur) linear infinite;
+  animation-delay:var(--delay);
+}
+.leaf svg{ width:100%; height:100%; display:block; }
+.leaf.tone-a{ color:var(--leaf-a); }
+.leaf.tone-b{ color:var(--leaf-b); }
+.leaf.tone-c{ color:var(--leaf-c); }
+@keyframes leaf-fall{
+  0%{ transform:translate(0,-10vh) rotate(0deg); opacity:0; }
+  8%{ opacity:0.9; }
+  50%{ transform:translate(var(--drift), 48vh) rotate(160deg); }
+  92%{ opacity:0.85; }
+  100%{ transform:translate(calc(var(--drift) * -1), 105vh) rotate(320deg); opacity:0; }
+}
+@media (prefers-reduced-motion: reduce){
+  .leaf{ animation:none; opacity:0; }
+}
+
+.choice-row{
+  display:flex; gap:26px; justify-content:center; flex-wrap:wrap;
+  padding:56px 0 90px;
+  position:relative; z-index:1;
+}
+.choice-card{
+  width:280px;
+  background:linear-gradient(165deg, var(--washi-soft), var(--washi));
+  color:var(--sumi);
+  border-radius:20px;
+  padding:34px 26px 30px;
+  position:relative;
+  overflow:hidden;
+  box-shadow:var(--shadow);
+  border:1px solid rgba(0,0,0,0.04);
+  transition:transform .35s ease, box-shadow .35s ease;
+  text-align:left;
+}
+.choice-card:hover, .choice-card:focus-visible{
+  transform:translateY(-8px);
+  box-shadow:0 26px 55px rgba(10,16,28,0.5);
+}
+.choice-card .ghost-kanji{
+  position:absolute; right:-6px; bottom:-30px;
+  font-family:'Shippori Mincho', serif;
+  font-size:170px; font-weight:700;
+  color:var(--sumi); opacity:0.06;
+  line-height:1;
+  pointer-events:none;
+}
+.choice-card .kanji-big{
+  font-family:'Shippori Mincho', serif;
+  font-size:46px; font-weight:700;
+  display:block; margin-bottom:6px;
+}
+.choice-card .en-label{
+  display:block; font-size:19px; font-weight:600; margin-bottom:10px;
+}
+.choice-card .desc{
+  font-size:13.5px; color:var(--ink-soft); line-height:1.55; margin-bottom:22px;
+  min-height:44px;
+}
+.choice-card .go{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:13px; font-weight:700; letter-spacing:0.05em;
+  color:var(--washi-soft); background:var(--shu);
+  padding:9px 16px; border-radius:100px;
+}
+.choice-card .go svg{width:13px; height:13px;}
+
+.landing-footer{
+  text-align:center; padding:0 0 50px; font-size:12.5px; color:var(--washi);
+  opacity:0.4; letter-spacing:0.04em; position:relative; z-index:1;
+}
+
+/* ---------- CATEGORY GRID (kanji section) ---------- */
+.section-header{ padding:38px 0 8px; text-align:center; }
+.section-header h1{
+  font-size:clamp(30px,5vw,42px); margin:6px 0 8px; color:var(--washi-soft);
+}
+.section-header p{
+  color:var(--washi); opacity:0.7; font-size:14.5px; max-width:480px; margin:0 auto;
+  font-weight:300; line-height:1.6;
+}
+
+.cat-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:20px; padding:38px 0 80px;
+}
+.cat-card{
+  background:linear-gradient(160deg, var(--indigo-soft), var(--indigo-mid));
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:22px 20px 20px;
+  position:relative; overflow:hidden;
+  min-height:150px;
+  display:flex; flex-direction:column; justify-content:space-between;
+  transition:transform .28s ease, border-color .28s ease, background .28s ease;
+}
+.cat-card.active-card:hover, .cat-card.active-card:focus-visible{
+  transform:translateY(-5px);
+  border-color:var(--gold);
+  background:linear-gradient(160deg, #34526F, #2A425C);
+}
+.cat-card .ghost-kanji{
+  position:absolute; right:-4px; top:-14px;
+  font-family:'Shippori Mincho', serif;
+  font-size:98px; font-weight:700; color:var(--gold);
+  opacity:0.12; line-height:1; pointer-events:none;
+}
+.cat-card .cat-jp{
+  font-family:'Shippori Mincho', serif;
+  font-size:24px; font-weight:600; color:var(--gold);
+  position:relative; z-index:1;
+}
+.cat-card .cat-en{
+  font-size:15.5px; font-weight:600; color:var(--washi-soft);
+  margin-top:4px; position:relative; z-index:1;
+}
+.cat-card .cat-meta{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-top:18px; position:relative; z-index:1;
+}
+.count-badge{
+  font-size:12px; padding:4px 10px; border-radius:100px;
+  background:rgba(199,161,67,0.16); color:var(--gold); font-weight:600;
+  letter-spacing:0.03em;
+}
+.count-badge.empty{ background:rgba(255,255,255,0.06); color:var(--washi); opacity:0.6; }
+.arrow-hint{ font-size:13px; color:var(--washi); opacity:0.55; }
+.cat-card.disabled{ opacity:0.55; cursor:default; }
+
+/* ---------- CATEGORY DETAIL ---------- */
+.detail-header{
+  padding:30px 0 6px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px;
+}
+.detail-header .cat-jp-big{ font-family:'Shippori Mincho', serif; font-size:44px; color:var(--gold); font-weight:600; }
+.detail-header h1{ margin:2px 0 0; font-size:clamp(22px,4vw,30px); color:var(--washi-soft); }
+.detail-header .count-line{ font-size:13.5px; color:var(--washi); opacity:0.6; }
+
+.mode-toggle{
+  display:flex; justify-content:center; gap:8px; margin:26px 0 10px;
+}
+.mode-toggle button{
+  background:transparent; border:1px solid var(--line); color:var(--washi);
+  padding:9px 20px; border-radius:100px; font-size:13.5px; font-weight:600;
+  letter-spacing:0.03em; opacity:0.75; transition:all .2s ease;
+}
+.mode-toggle button.active{
+  background:var(--shu); border-color:var(--shu); color:var(--washi-soft); opacity:1;
+}
+.mode-toggle button:hover{ opacity:1; }
+
+/* list view */
+.kanji-list{
+  max-width:640px; margin:26px auto 90px;
+  background:var(--washi-soft); border-radius:16px; overflow:hidden;
+  box-shadow:var(--shadow);
+}
+.kanji-list .row{
+  display:grid; grid-template-columns:minmax(58px,max-content) 1fr auto;
+  align-items:center; gap:14px;
+  padding:16px 22px;
+  border-bottom:1px solid rgba(28,27,24,0.08);
+  color:var(--sumi);
+}
+.kanji-list .row:last-child{ border-bottom:none; }
+.kanji-list .row:nth-child(even){ background:rgba(183,69,47,0.035); }
+.kanji-list .k{
+  font-family:'Shippori Mincho', serif; font-size:27px; font-weight:700;
+  white-space:nowrap;
+}
+.kanji-list .mid{ display:flex; flex-direction:column; gap:2px; }
+.kanji-list .hira{ font-size:14.5px; color:var(--shu-dark); font-weight:600; }
+.kanji-list .meaning{ font-size:13px; color:var(--ink-soft); }
+.kanji-list .idx{ font-size:11.5px; color:var(--ink-soft); opacity:0.45; }
+
+/* flashcard view */
+.flash-stage{
+  display:flex; flex-direction:column; align-items:center;
+  padding:20px 0 40px;
+}
+.flash-controls-top{
+  display:flex; align-items:center; gap:16px; margin-bottom:22px;
+}
+.counter-pill{
+  font-size:12.5px; color:var(--washi); opacity:0.65; letter-spacing:0.05em;
+}
+.icon-btn{
+  background:transparent; border:1px solid var(--line); color:var(--washi);
+  width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+  font-size:13px;
+}
+.icon-btn:hover{ border-color:var(--gold); color:var(--gold); }
+
+.flip-card{
+  width:min(340px,84vw); height:230px;
+  perspective:1400px;
+  margin-bottom:26px;
+}
+.flip-card-inner{
+  position:relative; width:100%; height:100%;
+  transition:transform .55s cubic-bezier(.4,.2,.2,1);
+  transform-style:preserve-3d;
+  cursor:pointer;
+}
+@media (prefers-reduced-motion: reduce){
+  .flip-card-inner{ transition:none; }
+}
+.flip-card.flipped .flip-card-inner{ transform:rotateY(180deg); }
+.face{
+  position:absolute; inset:0; backface-visibility:hidden;
+  border-radius:20px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  box-shadow:var(--shadow);
+}
+.face-front{
+  background:linear-gradient(165deg, var(--washi-soft), var(--washi));
+  color:var(--sumi);
+}
+.face-front .kbig{ font-family:'Shippori Mincho', serif; font-size:76px; font-weight:700; }
+.face-front .hint{ margin-top:14px; font-size:11.5px; letter-spacing:0.1em; color:var(--ink-soft); opacity:0.55; text-transform:uppercase; }
+.face-back{
+  background:linear-gradient(165deg, var(--shu), var(--shu-dark));
+  color:var(--washi-soft);
+  transform:rotateY(180deg);
+  padding:20px;
+  text-align:center;
+}
+.face-back .hira-big{ font-size:30px; font-weight:600; font-family:'Shippori Mincho', serif; margin-bottom:8px; }
+.face-back .meaning-line{ font-size:15px; opacity:0.92; }
+.face-back .meaning-line .kanji-mini{ display:block; font-size:12px; opacity:0.7; margin-top:10px; letter-spacing:0.04em;}
+
+.flash-nav{
+  display:flex; align-items:center; gap:18px;
+}
+.nav-btn{
+  background:var(--indigo-soft); border:1px solid var(--line); color:var(--washi-soft);
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:17px;
+}
+.nav-btn:hover{ border-color:var(--gold); color:var(--gold); }
+.nav-btn:disabled{ opacity:0.3; cursor:default; }
+
+.empty-state{
+  max-width:420px; margin:50px auto 100px; text-align:center;
+  color:var(--washi); opacity:0.75; padding:0 20px;
+}
+.empty-state .glyph{ font-family:'Shippori Mincho', serif; font-size:54px; color:var(--gold); opacity:0.5; margin-bottom:10px; }
+.empty-state h2{ color:var(--washi-soft); font-size:20px; margin-bottom:8px; }
+.empty-state p{ font-size:13.5px; line-height:1.6; }
+
+.back-link{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:13.5px; color:var(--gold); margin:0 auto 6px;
+  background:none; border:none;
+}
+.back-link:hover{ text-decoration:underline; }
+
+footer.site-footer{
+  text-align:center; padding:30px 0 40px; font-size:12px; color:var(--washi); opacity:0.35;
+}
+
+@media (max-width:520px){
+  .kanji-list .row{ grid-template-columns:minmax(48px,max-content) 1fr auto; padding:14px 16px; gap:10px; }
+  .kanji-list .k{ font-size:20px; }
+  .wrap{ padding:0 18px; }
+}
