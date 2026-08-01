@@ -345,6 +345,34 @@
       <div class="mode-toggle">
         <button data-mode="list" class="${mode==="list"?"active":""}">List</button>
         <button data-mode="cards" class="${mode==="cards"?"active":""}">Flashcards</button>
+        <button type="button" class="add-btn" id="openAddModalBtn" aria-label="Add your own kanji">＋</button>
+      </div>`;
+
+    const addModal = `
+      <div class="add-kanji-overlay" id="addKanjiOverlay" aria-hidden="true">
+        <div class="add-kanji-backdrop" id="addKanjiBackdrop"></div>
+        <div class="add-kanji-modal" role="dialog" aria-modal="true" aria-labelledby="add-kanji-title">
+          <div class="modal-header">
+            <h3 id="add-kanji-title">Add your own kanji</h3>
+            <button type="button" class="modal-close" id="closeAddModalBtn" aria-label="Close">×</button>
+          </div>
+          <div class="modal-field">
+            <label for="addKanji">Kanji</label>
+            <input type="text" id="addKanji" placeholder="例: 旅" maxlength="10">
+          </div>
+          <div class="modal-field">
+            <label for="addHira">Hiragana</label>
+            <input type="text" id="addHira" placeholder="たび" maxlength="20">
+          </div>
+          <div class="modal-field">
+            <label for="addMeaning">English meaning</label>
+            <input type="text" id="addMeaning" placeholder="journey; trip" maxlength="50">
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="secondary-btn" id="cancelAddModalBtn">Cancel</button>
+            <button type="button" class="primary-btn" id="submitKanji">Add</button>
+          </div>
+        </div>
       </div>`;
 
     const body = mode === "list" ? renderListView(cat) : renderFlashView(cat);
@@ -355,6 +383,7 @@
         ${header}
         ${toggle}
         ${body}
+        ${addModal}
       </div>`;
   }
 
@@ -368,22 +397,7 @@
         </div>
         <div class="idx">${String(i+1).padStart(2,"0")}</div>
       </div>`).join("");
-    
-    const addForm = `
-      <div class="add-kanji-form">
-        <div style="margin-top:20px; padding-top:20px; border-top:1px solid rgba(199,161,67,0.2);">
-          <h3 style="font-size:14px; color:var(--washi-soft); margin:0 0 16px; font-weight:600;">Add your own kanji</h3>
-          <div style="display:grid; grid-template-columns:1fr 1fr 2fr auto; gap:10px; align-items:flex-end;">
-            <input type="text" id="addKanji" placeholder="Kanji" maxlength="10" style="padding:8px; border-radius:6px; border:1px solid rgba(199,161,67,0.3); background:rgba(42,53,72,0.5); color:var(--washi-soft); font-family:'Shippori Mincho',serif; font-size:16px;" />
-            <input type="text" id="addHira" placeholder="Hiragana" maxlength="20" style="padding:8px; border-radius:6px; border:1px solid rgba(199,161,67,0.3); background:rgba(42,53,72,0.5); color:var(--washi-soft); font-size:13px;" />
-            <input type="text" id="addMeaning" placeholder="Meaning" maxlength="50" style="padding:8px; border-radius:6px; border:1px solid rgba(199,161,67,0.3); background:rgba(42,53,72,0.5); color:var(--washi-soft); font-size:13px;" />
-            <button id="submitKanji" style="padding:8px 16px; background:var(--shu); color:var(--washi-soft); border:none; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer;">Add</button>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    return `<div class="kanji-list wrap">${rows}</div>${addForm}`;
+    return `<div class="kanji-list wrap">${rows}</div>`;
   }
 
   function renderFlashView(cat){
@@ -425,7 +439,7 @@
   }
 
   function bindCategoryDetail(cat, mode){
-    document.querySelectorAll(".mode-toggle button").forEach(btn=>{
+    document.querySelectorAll(".mode-toggle button[data-mode]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const m = btn.getAttribute("data-mode");
         const target = `kanji/${cat.id}/${m}`;
@@ -439,24 +453,49 @@
       });
     });
 
-    // Handle add kanji form submission
+    const openModalBtn = document.getElementById("openAddModalBtn");
+    const addModal = document.getElementById("addKanjiOverlay");
+    const backdrop = document.getElementById("addKanjiBackdrop");
+    const closeModalBtn = document.getElementById("closeAddModalBtn");
+    const cancelModalBtn = document.getElementById("cancelAddModalBtn");
     const submitBtn = document.getElementById("submitKanji");
+
+    function openAddModal(){
+      if(!addModal) return;
+      addModal.classList.add("visible");
+      addModal.setAttribute("aria-hidden", "false");
+      const input = document.getElementById("addKanji");
+      if(input) setTimeout(()=>input.focus(), 50);
+    }
+
+    function closeAddModal(){
+      if(!addModal) return;
+      addModal.classList.remove("visible");
+      addModal.setAttribute("aria-hidden", "true");
+    }
+
+    if(openModalBtn) openModalBtn.addEventListener("click", openAddModal);
+    if(backdrop) backdrop.addEventListener("click", closeAddModal);
+    if(closeModalBtn) closeModalBtn.addEventListener("click", closeAddModal);
+    if(cancelModalBtn) cancelModalBtn.addEventListener("click", closeAddModal);
+
     if(submitBtn){
       submitBtn.addEventListener("click", ()=>{
         const kanjiInput = document.getElementById("addKanji");
         const hiraInput = document.getElementById("addHira");
         const meaningInput = document.getElementById("addMeaning");
-        
+
         if(kanjiInput && hiraInput && meaningInput){
           const kanji = kanjiInput.value.trim();
           const hiragana = hiraInput.value.trim();
           const meaning = meaningInput.value.trim();
-          
+
           if(kanji && hiragana && meaning){
             addKanjiToCategory(cat.id, kanji, hiragana, meaning);
             kanjiInput.value = "";
             hiraInput.value = "";
             meaningInput.value = "";
+            closeAddModal();
             rerenderDetail(cat, mode);
           }
         }

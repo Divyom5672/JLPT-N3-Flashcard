@@ -305,7 +305,7 @@ button{font-family:inherit; cursor:pointer;}
 .detail-header .count-line{ font-size:13.5px; color:var(--washi); opacity:0.6; }
 
 .mode-toggle{
-  display:flex; justify-content:center; gap:8px; margin:26px 0 10px;
+  display:flex; justify-content:center; align-items:center; gap:8px; margin:26px 0 10px;
 }
 .mode-toggle button{
   background:transparent; border:1px solid var(--line); color:var(--washi);
@@ -316,6 +316,66 @@ button{font-family:inherit; cursor:pointer;}
   background:var(--shu); border-color:var(--shu); color:var(--washi-soft); opacity:1;
 }
 .mode-toggle button:hover{ opacity:1; }
+.mode-toggle .add-btn{
+  width:42px; min-width:42px; height:42px; padding:0; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center; font-size:24px; line-height:1;
+  background:var(--indigo-soft); border-color:var(--gold); color:var(--gold); opacity:1;
+}
+.mode-toggle .add-btn:hover{ background:rgba(199,161,67,0.15); }
+
+.add-kanji-overlay{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  z-index:80; pointer-events:none; opacity:0;
+  transition:opacity .25s ease;
+}
+.add-kanji-overlay.visible{
+  pointer-events:auto; opacity:1;
+}
+.add-kanji-backdrop{
+  position:absolute; inset:0; background:rgba(12,17,25,0.36);
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  opacity:0; transition:opacity .25s ease;
+}
+.add-kanji-overlay.visible .add-kanji-backdrop{ opacity:1; }
+.add-kanji-modal{
+  position:relative; z-index:1; width:min(360px, calc(100vw - 28px));
+  background:linear-gradient(180deg, rgba(27,38,51,0.98), rgba(17,25,38,0.96));
+  border:1px solid rgba(199,161,67,0.35); border-radius:18px; box-shadow:0 22px 48px rgba(0,0,0,0.35);
+  padding:18px 18px 16px; transform:translateY(18px) scale(0.96); opacity:0;
+  transition:transform .25s ease, opacity .25s ease;
+}
+.add-kanji-overlay.visible .add-kanji-modal{
+  transform:translateY(0) scale(1); opacity:1;
+}
+.modal-header{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;
+}
+.modal-header h3{
+  margin:0; font-size:18px; color:var(--washi-soft);
+}
+.modal-close{
+  background:none; border:none; color:var(--washi); font-size:28px; line-height:1; padding:0 4px;
+}
+.modal-field{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+.modal-field label{ font-size:12px; color:var(--gold); font-weight:600; letter-spacing:0.04em; }
+.modal-field input{
+  background:rgba(255,255,255,0.05); border:1px solid rgba(199,161,67,0.32); border-radius:10px;
+  padding:10px 12px; color:var(--washi-soft); font-size:14px; outline:none;
+}
+.modal-field input::placeholder{ color:rgba(250,244,230,0.5); }
+.modal-field input:focus{ border-color:var(--gold); box-shadow:0 0 0 2px rgba(199,161,67,0.15); }
+.modal-actions{
+  display:flex; justify-content:flex-end; gap:10px; margin-top:16px;
+}
+.primary-btn, .secondary-btn{
+  border:none; border-radius:999px; padding:9px 16px; font-weight:600; font-size:13px; cursor:pointer;
+}
+.primary-btn{
+  background:var(--shu); color:var(--washi-soft);
+}
+.secondary-btn{
+  background:rgba(255,255,255,0.06); color:var(--washi); border:1px solid rgba(255,255,255,0.08);
+}
 
 /* list view */
 .kanji-list{
