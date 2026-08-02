@@ -14,53 +14,117 @@
 <div id="app"></div>
 
 <script src="data.js"></script>
+<script src="sql-wasm.js"></script>
 <script>
 (function(){
   "use strict";
 
   /* ---------------- DATA ---------------- */
-  /* Data loaded from data.js */
+  /* Data loaded from data.js and persisted through local SQL */
+  const DB_KEY = "kanji_no_michi_sqlite";
+  let sqlDb = null;
 
-  /* Load user-added kanji from localStorage */
-  function loadUserKanji() {
-    const stored = localStorage.getItem('userKanji');
-    if (stored) {
-      try {
-        const userData = JSON.parse(stored);
-        userData.forEach(item => {
-          const cat = byId(item.catId);
-          if (cat) {
-            cat.words.push(item.word);
-          }
-        });
-      } catch (e) {
-        console.error('Error loading user kanji:', e);
-      }
-    }
+  function persistSqlDatabase() {
+    if (!sqlDb) return;
+    const data = sqlDb.export();
+    const binary = Array.from(data).map(byte => String.fromCharCode(byte)).join("");
+    localStorage.setItem(DB_KEY, btoa(binary));
   }
 
-  function saveUserKanji(catId, word) {
-    const stored = localStorage.getItem('userKanji') || '[]';
-    let userData = [];
-    try {
-      userData = JSON.parse(stored);
-    } catch (e) {
-      userData = [];
+  function loadCategoriesFromDb() {
+    if (!sqlDb) return;
+    const result = sqlDb.exec(`SELECT cat_id, kanji, hiragana, meaning FROM words ORDER BY id`);
+    const rows = result[0] ? result[0].values : [];
+    const freshCategories = CATEGORIES.map(cat => ({ ...cat, words: [] }));
+
+    rows.forEach(([catId, kanji, hiragana, meaning]) => {
+      const cat = freshCategories.find(item => item.id === catId);
+      if (cat) {
+        cat.words.push({ k: kanji, h: hiragana, m: meaning });
+      }
+    });
+
+    CATEGORIES.splice(0, CATEGORIES.length, ...freshCategories);
+  }
+
+  async function initSqlDatabase() {
+    if (!window.initSqlJs) {
+      throw new Error("SQL.js failed to load.");
     }
-    userData.push({ catId, word });
-    localStorage.setItem('userKanji', JSON.stringify(userData));
+
+    const SQL = await window.initSqlJs({
+      locateFile: file => `./${file}`
+    });
+
+    const stored = localStorage.getItem(DB_KEY);
+    if (stored) {
+      try {
+        const binary = atob(stored);
+        const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+        sqlDb = new SQL.Database(bytes);
+      } catch (error) {
+        console.warn("Could not restore SQL database from localStorage. Starting fresh.", error);
+        sqlDb = new SQL.Database();
+      }
+    } else {
+      sqlDb = new SQL.Database();
+    }
+
+    sqlDb.run(`
+      CREATE TABLE IF NOT EXISTS words (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cat_id TEXT NOT NULL,
+        kanji TEXT NOT NULL,
+        hiragana TEXT NOT NULL,
+        meaning TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'seed'
+      )
+    `);
+
+    const count = sqlDb.exec(`SELECT COUNT(*) AS count FROM words`)[0]?.values?.[0]?.[0] || 0;
+    if (count === 0) {
+      const insertStmt = sqlDb.prepare(`
+        INSERT INTO words (cat_id, kanji, hiragana, meaning, source)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      CATEGORIES.forEach(cat => {
+        cat.words.forEach(word => {
+          insertStmt.run([cat.id, word.k, word.h, word.m, "seed"]);
+        });
+      });
+
+      insertStmt.free();
+      persistSqlDatabase();
+    }
+
+    loadCategoriesFromDb();
   }
 
   function addKanjiToCategory(catId, kanji, hiragana, meaning) {
     const cat = byId(catId);
-    if (!cat) return false;
-    const newWord = { k: kanji, h: hiragana, m: meaning };
-    cat.words.push(newWord);
-    saveUserKanji(catId, newWord);
+    if (!cat || !sqlDb) return false;
+
+    const stmt = sqlDb.prepare(`
+      INSERT INTO words (cat_id, kanji, hiragana, meaning, source)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    stmt.run([catId, kanji, hiragana, meaning, "user"]);
+    stmt.free();
+    persistSqlDatabase();
+    loadCategoriesFromDb();
     return true;
   }
 
-  loadUserKanji();
+  async function bootApp() {
+    try {
+      await initSqlDatabase();
+      render();
+    } catch (error) {
+      console.error("Failed to initialize SQL database:", error);
+      alert("The local database could not be loaded. Please refresh the page.");
+    }
+  }
 
   /* ---------------- STATE (per flashcard session) ---------------- */
   let flashState = { catId:null, order:[], index:0, flipped:false };
@@ -91,8 +155,10 @@
     location.hash = hash;
   }
 
-  window.addEventListener("hashchange", render);
-  window.addEventListener("DOMContentLoaded", render);
+  window.addEventListener("hashchange", () => {
+    if (sqlDb) render();
+  });
+  window.addEventListener("DOMContentLoaded", bootApp);
 
   /* ---------------- ICONS ---------------- */
   const ICON_ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
