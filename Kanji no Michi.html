@@ -22,6 +22,10 @@
   /* ---------------- DATA ---------------- */
   /* Data loaded from data.js and persisted through local SQL */
   const DB_KEY = "kanji_no_michi_sqlite";
+  /* Bump this whenever the bundled word list in data.js changes, so existing
+     local databases pick up the new seed. Words the user added themselves
+     (source = 'user') survive re-seeding. */
+  const SEED_VERSION = "somatome-n3-daily-v1";
   let sqlDb = null;
 
   function persistSqlDatabase() {
@@ -33,7 +37,10 @@
 
   function loadCategoriesFromDb() {
     if (!sqlDb) return;
-    const result = sqlDb.exec(`SELECT cat_id, kanji, hiragana, meaning FROM words ORDER BY id`);
+    const result = sqlDb.exec(`
+      SELECT cat_id, kanji, hiragana, meaning FROM words
+      ORDER BY CASE source WHEN 'seed' THEN 0 ELSE 1 END, id
+    `);
     const rows = result[0] ? result[0].values : [];
     const freshCategories = CATEGORIES.map(cat => ({ ...cat, words: [] }));
 
@@ -81,24 +88,41 @@
       )
     `);
 
-    const count = sqlDb.exec(`SELECT COUNT(*) AS count FROM words`)[0]?.values?.[0]?.[0] || 0;
-    if (count === 0) {
-      const insertStmt = sqlDb.prepare(`
-        INSERT INTO words (cat_id, kanji, hiragana, meaning, source)
-        VALUES (?, ?, ?, ?, ?)
-      `);
+    sqlDb.run(`
+      CREATE TABLE IF NOT EXISTS meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    `);
 
-      CATEGORIES.forEach(cat => {
-        cat.words.forEach(word => {
-          insertStmt.run([cat.id, word.k, word.h, word.m, "seed"]);
-        });
-      });
+    const storedVersion =
+      sqlDb.exec(`SELECT value FROM meta WHERE key = 'seed_version'`)[0]?.values?.[0]?.[0] || null;
 
-      insertStmt.free();
+    if (storedVersion !== SEED_VERSION) {
+      seedWords();
+      sqlDb.run(`INSERT OR REPLACE INTO meta (key, value) VALUES ('seed_version', ?)`, [SEED_VERSION]);
       persistSqlDatabase();
     }
 
     loadCategoriesFromDb();
+  }
+
+  /* Reloads the bundled word list, leaving the user's own additions in place. */
+  function seedWords() {
+    sqlDb.run(`DELETE FROM words WHERE source = 'seed'`);
+
+    const insertStmt = sqlDb.prepare(`
+      INSERT INTO words (cat_id, kanji, hiragana, meaning, source)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    CATEGORIES.forEach(cat => {
+      cat.words.forEach(word => {
+        insertStmt.run([cat.id, word.k, word.h, word.m, "seed"]);
+      });
+    });
+
+    insertStmt.free();
   }
 
   function addKanjiToCategory(catId, kanji, hiragana, meaning) {
@@ -128,6 +152,8 @@
 
   /* ---------------- STATE (per flashcard session) ---------------- */
   let flashState = { catId:null, order:[], index:0, flipped:false };
+
+  const totalWords = () => CATEGORIES.reduce((sum, cat) => sum + cat.words.length, 0);
 
   function shuffle(arr){
     const a = arr.slice();
@@ -237,22 +263,34 @@
       bindTopNav();
       return;
     }
-    if(parts[0] === "kanji" && parts.length === 1){
-      app.innerHTML = renderCategoryGrid();
-      bindTopNav();
-      bindCategoryGrid();
-      return;
-    }
-    if(parts[0] === "kanji" && parts.length >= 2){
-      const cat = byId(parts[1]);
-      if(!cat){ navigate(""); return; }
-      const mode = parts[2] === "cards" ? "cards" : "list";
+    if(parts[0] === "kanji"){
+      if(parts.length === 1){
+        app.innerHTML = renderWeekGrid();
+        bindTopNav();
+        bindCardGrid("data-week");
+        return;
+      }
+
+      const week = weekById(parts[1]);
+      if(!week){ navigate("kanji"); return; }
+
+      if(parts.length === 2){
+        app.innerHTML = renderDayGrid(week);
+        bindTopNav();
+        bindCardGrid("data-day");
+        return;
+      }
+
+      const cat = byId(week.id + parts[2]);
+      if(!cat){ navigate(`kanji/${week.id}`); return; }
+
+      const mode = parts[3] === "cards" ? "cards" : "list";
       if(mode === "cards" && cat.words.length > 0){
         startFlash(cat.id, true);
       }
-      app.innerHTML = renderCategoryDetail(cat, mode);
+      app.innerHTML = renderCategoryDetail(week, cat, mode);
       bindTopNav();
-      bindCategoryDetail(cat, mode);
+      bindCategoryDetail(week, cat, mode);
       return;
     }
     navigate("");
@@ -305,7 +343,7 @@
             <span class="ghost-kanji">漢</span>
             <span class="kanji-big">漢字</span>
             <span class="en-label">Kanji</span>
-            <span class="desc">Study characters by category — verbs, adjectives, daily life and more.</span>
+            <span class="desc">Six weeks of daily sets — ${totalWords()} words, seven days at a time.</span>
             <span class="go">Begin ${ICON_ARROW}</span>
           </a>
           <a class="choice-card" href="#/vocabulary" data-nav="vocabulary" tabindex="0">
@@ -343,19 +381,20 @@
       </div>`;
   }
 
-  /* ---------------- CATEGORY GRID ---------------- */
-  function renderCategoryGrid(){
-    const cards = CATEGORIES.map(c=>{
-      const disabled = c.words.length === 0;
+  /* ---------------- WEEK GRID ---------------- */
+  function renderWeekGrid(){
+    const cards = WEEKS.map(w=>{
+      const disabled = w.wordCount === 0;
       return `
-        <div class="cat-card ${disabled ? "disabled" : "active-card"}" ${disabled ? "" : `data-cat="${c.id}" tabindex="0" role="button"`}>
-          <span class="ghost-kanji">${c.glyph}</span>
+        <div class="cat-card ${disabled ? "disabled" : "active-card"}" ${disabled ? "" : `data-week="${w.id}" tabindex="0" role="button"`}>
+          <span class="ghost-kanji">${w.glyph}</span>
           <div>
-            <div class="cat-jp">${c.jp}</div>
-            <div class="cat-en">${c.en}</div>
+            <div class="cat-jp">${w.jp}</div>
+            <div class="cat-en">${w.en}</div>
+            <div class="cat-sub">${w.days.length} day${w.days.length===1?"":"s"} of study</div>
           </div>
           <div class="cat-meta">
-            <span class="count-badge ${disabled ? "empty" : ""}">${disabled ? "Coming soon" : c.words.length + " words"}</span>
+            <span class="count-badge ${disabled ? "empty" : ""}">${disabled ? "Coming soon" : w.wordCount + " words"}</span>
             ${disabled ? "" : `<span class="arrow-hint">${ICON_ARROW}</span>`}
           </div>
         </div>`;
@@ -365,32 +404,83 @@
       <div class="content">
         ${topbar(`<button data-nav="">漢字の道</button><span class="sep">/</span><span class="current">漢字</span>`)}
         <div class="section-header wrap">
-          <h1>Choose a category</h1>
-          <p>Pick a set of kanji to study as a list or with flashcards.</p>
+          <h1>Choose a week</h1>
+          <p>The course runs for six weeks, seven days at a time. Pick a week to see its days.</p>
         </div>
         <div class="cat-grid wrap">${cards}</div>
       </div>`;
   }
 
-  function bindCategoryGrid(){
-    document.querySelectorAll(".cat-card[data-cat]").forEach(el=>{
-      const go = ()=> navigate(`kanji/${el.getAttribute("data-cat")}`);
+  /* ---------------- DAY GRID ---------------- */
+  function renderDayGrid(week){
+    const cards = week.days.map(d=>{
+      const disabled = d.words.length === 0;
+      return `
+        <div class="cat-card ${disabled ? "disabled" : "active-card"}" ${disabled ? "" : `data-day="${d.route}" tabindex="0" role="button"`}>
+          <span class="ghost-kanji">${d.glyph}</span>
+          <div>
+            <div class="cat-jp">${d.jp}</div>
+            <div class="cat-en">${d.en}</div>
+            <div class="cat-sub kanji-peek">${kanjiPeek(d)}</div>
+          </div>
+          <div class="cat-meta">
+            <span class="count-badge ${disabled ? "empty" : ""}">${disabled ? "No words yet" : d.words.length + " words"}</span>
+            ${disabled ? "" : `<span class="arrow-hint">${ICON_ARROW}</span>`}
+          </div>
+        </div>`;
+    }).join("");
+
+    const crumb = `
+      <button data-nav="">漢字の道</button><span class="sep">/</span>
+      <button data-nav="kanji">漢字</button><span class="sep">/</span>
+      <span class="current">${week.jp}</span>`;
+
+    return `
+      <div class="content">
+        ${topbar(crumb)}
+        <div class="section-header wrap">
+          <div class="section-jp">${week.jp}</div>
+          <h1>${week.en}</h1>
+          <p>${week.wordCount} words spread over ${week.days.length} days. Pick a day to study it as a list or with flashcards.</p>
+        </div>
+        <div class="cat-grid wrap">${cards}</div>
+      </div>`;
+  }
+
+  /* The first handful of distinct kanji in a set — a glance at what it covers. */
+  function kanjiPeek(cat){
+    const CJK = /[一-鿿]/;
+    const seen = [];
+    for(const w of cat.words){
+      for(const ch of w.k){
+        if(CJK.test(ch) && !seen.includes(ch)) seen.push(ch);
+      }
+      if(seen.length >= 7) break;
+    }
+    return seen.slice(0,7).join("・");
+  }
+
+  /* Cards in a grid carry their destination in a data attribute. */
+  function bindCardGrid(attr){
+    document.querySelectorAll(`.cat-card[${attr}]`).forEach(el=>{
+      const go = ()=> navigate(`kanji/${el.getAttribute(attr)}`);
       el.addEventListener("click", go);
       el.addEventListener("keydown", e=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); go(); }});
     });
   }
 
-  /* ---------------- CATEGORY DETAIL ---------------- */
-  function renderCategoryDetail(cat, mode){
+  /* ---------------- DAY DETAIL ---------------- */
+  function renderCategoryDetail(week, cat, mode){
     const crumb = `
       <button data-nav="">漢字の道</button><span class="sep">/</span>
       <button data-nav="kanji">漢字</button><span class="sep">/</span>
+      <button data-nav="kanji/${week.id}">${week.jp}</button><span class="sep">/</span>
       <span class="current">${cat.jp}</span>`;
 
     const header = `
       <div class="detail-header wrap">
         <div class="cat-jp-big">${cat.jp}</div>
-        <h1>${cat.en}</h1>
+        <h1>${week.en} · ${cat.en}</h1>
         <div class="count-line">${cat.words.length} word${cat.words.length===1?"":"s"} in this set</div>
       </div>`;
 
@@ -402,7 +492,7 @@
           <div class="empty-state">
             <div class="glyph">${cat.glyph}</div>
             <h2>No words yet</h2>
-            <p>This category is empty for now — more kanji are on the way. Try another category in the meantime.</p>
+            <p>This day is empty for now. Try another day in the meantime.</p>
           </div>
         </div>`;
     }
@@ -504,15 +594,15 @@
       </div>`;
   }
 
-  function bindCategoryDetail(cat, mode){
+  function bindCategoryDetail(week, cat, mode){
     document.querySelectorAll(".mode-toggle button[data-mode]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const m = btn.getAttribute("data-mode");
-        const target = `kanji/${cat.id}/${m}`;
+        const target = `kanji/${cat.route}/${m}`;
         const current = parseHash().join("/");
         if(current === target){
           if(m === "cards" && cat.words.length > 0) startFlash(cat.id, true);
-          rerenderDetail(cat, m);
+          rerenderDetail(week, cat, m);
         } else {
           navigate(target);
         }
@@ -562,7 +652,9 @@
             hiraInput.value = "";
             meaningInput.value = "";
             closeAddModal();
-            rerenderDetail(cat, mode);
+            /* addKanjiToCategory reloads CATEGORIES from the database, which
+               replaces the set objects — re-read ours so the new word shows. */
+            rerenderDetail(week, byId(cat.id) || cat, mode);
           }
         }
       });
@@ -586,29 +678,29 @@
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     if(prevBtn) prevBtn.addEventListener("click", ()=>{
-      if(flashState.index > 0){ flashState.index--; flashState.flipped=false; rerenderDetail(cat,"cards"); }
+      if(flashState.index > 0){ flashState.index--; flashState.flipped=false; rerenderDetail(week,cat,"cards"); }
     });
     if(nextBtn) nextBtn.addEventListener("click", ()=>{
-      if(flashState.index < flashState.order.length-1){ flashState.index++; flashState.flipped=false; rerenderDetail(cat,"cards"); }
+      if(flashState.index < flashState.order.length-1){ flashState.index++; flashState.flipped=false; rerenderDetail(week,cat,"cards"); }
     });
 
     const shuffleBtn = document.getElementById("shuffleBtn");
     if(shuffleBtn) shuffleBtn.addEventListener("click", ()=>{
       startFlash(cat.id, true);
-      rerenderDetail(cat,"cards");
+      rerenderDetail(week,cat,"cards");
     });
     const resetBtn = document.getElementById("resetBtn");
     if(resetBtn) resetBtn.addEventListener("click", ()=>{
       startFlash(cat.id, false);
-      rerenderDetail(cat,"cards");
+      rerenderDetail(week,cat,"cards");
     });
   }
 
-  function rerenderDetail(cat, mode){
+  function rerenderDetail(week, cat, mode){
     const app = document.getElementById("app");
-    app.innerHTML = renderCategoryDetail(cat, mode);
+    app.innerHTML = renderCategoryDetail(week, cat, mode);
     bindTopNav();
-    bindCategoryDetail(cat, mode);
+    bindCategoryDetail(week, cat, mode);
   }
 
 })();

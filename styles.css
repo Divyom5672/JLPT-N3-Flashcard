@@ -239,8 +239,12 @@ button{font-family:inherit; cursor:pointer;}
   opacity:0.4; letter-spacing:0.04em; position:relative; z-index:1;
 }
 
-/* ---------- CATEGORY GRID (kanji section) ---------- */
+/* ---------- WEEK / DAY GRID (kanji section) ---------- */
 .section-header{ padding:38px 0 8px; text-align:center; }
+.section-header .section-jp{
+  font-family:'Shippori Mincho', serif;
+  font-size:26px; color:var(--gold); font-weight:600;
+}
 .section-header h1{
   font-size:clamp(30px,5vw,42px); margin:6px 0 8px; color:var(--washi-soft);
 }
@@ -282,6 +286,14 @@ button{font-family:inherit; cursor:pointer;}
 .cat-card .cat-en{
   font-size:15.5px; font-weight:600; color:var(--washi-soft);
   margin-top:4px; position:relative; z-index:1;
+}
+.cat-card .cat-sub{
+  font-size:12.5px; color:var(--washi); opacity:0.6; font-weight:300;
+  margin-top:6px; line-height:1.5; position:relative; z-index:1;
+}
+.cat-card .cat-sub.kanji-peek{
+  font-family:'Shippori Mincho', serif;
+  font-size:14px; letter-spacing:0.02em; opacity:0.72;
 }
 .cat-card .cat-meta{
   display:flex; align-items:center; justify-content:space-between;
