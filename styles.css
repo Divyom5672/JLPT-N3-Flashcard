@@ -308,6 +308,18 @@ button{font-family:inherit; cursor:pointer;}
 .arrow-hint{ font-size:13px; color:var(--washi); opacity:0.55; }
 .cat-card.disabled{ opacity:0.55; cursor:default; }
 
+/* Oboero: whole-week shuffled deck, set apart from the day cards */
+.cat-card.oboero-card{
+  border-color:rgba(183,69,47,0.75);
+  background:linear-gradient(160deg, #4A2E33, #2E2A3C);
+}
+.cat-card.oboero-card.active-card:hover, .cat-card.oboero-card.active-card:focus-visible{
+  border-color:var(--shu);
+  background:linear-gradient(160deg, #5A3438, #36303F);
+}
+.cat-card.oboero-card .ghost-kanji{ color:var(--shu); opacity:0.22; }
+.cat-card.oboero-card .count-badge{ background:rgba(183,69,47,0.28); color:var(--washi-soft); }
+
 /* ---------- CATEGORY DETAIL ---------- */
 .detail-header{
   padding:30px 0 6px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px;

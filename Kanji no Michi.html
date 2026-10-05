@@ -281,6 +281,14 @@
         return;
       }
 
+      if(parts[2] === "oboero"){
+        startOboero(week);
+        app.innerHTML = renderOboero(week);
+        bindTopNav();
+        bindOboero(week);
+        return;
+      }
+
       const cat = byId(week.id + parts[2]);
       if(!cat){ navigate(`kanji/${week.id}`); return; }
 
@@ -430,6 +438,23 @@
         </div>`;
     }).join("");
 
+    /* Oboero: one shuffled deck holding every card from this week's days. */
+    const oboeroCount = weekWords(week).length;
+    const oboeroDisabled = oboeroCount === 0;
+    const oboeroCard = `
+        <div class="cat-card oboero-card ${oboeroDisabled ? "disabled" : "active-card"}" ${oboeroDisabled ? "" : `data-day="${week.id}/oboero" tabindex="0" role="button"`}>
+          <span class="ghost-kanji">覚</span>
+          <div>
+            <div class="cat-jp">覚えろ</div>
+            <div class="cat-en">Oboero</div>
+            <div class="cat-sub">Every card from ${week.en}, shuffled</div>
+          </div>
+          <div class="cat-meta">
+            <span class="count-badge ${oboeroDisabled ? "empty" : ""}">${oboeroDisabled ? "No words yet" : oboeroCount + " cards"}</span>
+            ${oboeroDisabled ? "" : `<span class="arrow-hint">${ICON_ARROW}</span>`}
+          </div>
+        </div>`;
+
     const crumb = `
       <button data-nav="">漢字の道</button><span class="sep">/</span>
       <button data-nav="kanji">漢字</button><span class="sep">/</span>
@@ -443,7 +468,7 @@
           <h1>${week.en}</h1>
           <p>${week.wordCount} words spread over ${week.days.length} days. Pick a day to study it as a list or with flashcards.</p>
         </div>
-        <div class="cat-grid wrap">${cards}</div>
+        <div class="cat-grid wrap">${cards}${oboeroCard}</div>
       </div>`;
   }
 
@@ -701,6 +726,130 @@
     app.innerHTML = renderCategoryDetail(week, cat, mode);
     bindTopNav();
     bindCategoryDetail(week, cat, mode);
+  }
+
+  /* ---------------- OBOERO (whole-week shuffled deck) ---------------- */
+  let oboeroState = { weekId:null, cards:[], index:0, flipped:false };
+
+  /* Every word from the week's days (including the user's own additions),
+     with exact repeats dropped so the same card doesn't show up twice. */
+  function weekWords(week){
+    const seen = new Set();
+    const words = [];
+    week.days.forEach(d => d.words.forEach(w => {
+      const key = `${w.k}|${w.h}|${w.m}`;
+      if(!seen.has(key)){ seen.add(key); words.push(w); }
+    }));
+    return words;
+  }
+
+  /* Called every time the section is opened, so the order is always fresh. */
+  function startOboero(week){
+    oboeroState = { weekId: week.id, cards: shuffle(weekWords(week)), index:0, flipped:false };
+  }
+
+  function renderOboero(week){
+    const crumb = `
+      <button data-nav="">漢字の道</button><span class="sep">/</span>
+      <button data-nav="kanji">漢字</button><span class="sep">/</span>
+      <button data-nav="kanji/${week.id}">${week.jp}</button><span class="sep">/</span>
+      <span class="current">覚えろ</span>`;
+
+    const total = oboeroState.cards.length;
+    const header = `
+      <div class="detail-header wrap">
+        <div class="cat-jp-big">覚えろ</div>
+        <h1>${week.en} · Oboero</h1>
+        <div class="count-line">${total} card${total===1?"":"s"} from all ${week.days.length} days, shuffled</div>
+      </div>`;
+
+    if(total === 0){
+      return `
+        <div class="content">
+          ${topbar(crumb)}
+          ${header}
+          <div class="empty-state">
+            <div class="glyph">覚</div>
+            <h2>No words yet</h2>
+            <p>This week has no cards yet. Try another week in the meantime.</p>
+          </div>
+        </div>`;
+    }
+
+    const pos = oboeroState.index;
+    const word = oboeroState.cards[pos];
+
+    return `
+      <div class="content">
+        ${topbar(crumb)}
+        ${header}
+        <div class="flash-stage wrap" style="padding-top:36px;">
+          <div class="flash-controls-top">
+            <span class="counter-pill">${pos+1} / ${total}</span>
+            <button class="icon-btn" id="shuffleBtn" title="Shuffle again" aria-label="Shuffle cards again">⤨</button>
+          </div>
+
+          <div class="flip-card ${oboeroState.flipped ? "flipped":""}" id="flipCard">
+            <div class="flip-card-inner">
+              <div class="face face-front">
+                <div class="kbig">${word.k}</div>
+                <div class="hint">Tap to reveal</div>
+              </div>
+              <div class="face face-back">
+                <div class="hira-big">${word.h}</div>
+                <div class="meaning-line">(${word.m})
+                  <span class="kanji-mini">${word.k}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flash-nav">
+            <button class="nav-btn" id="prevBtn" ${pos===0?"disabled":""} aria-label="Previous card">‹</button>
+            <button class="nav-btn" id="nextBtn" ${pos===total-1?"disabled":""} aria-label="Next card">›</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function bindOboero(week){
+    if(oboeroState.cards.length === 0) return;
+
+    const flipCard = document.getElementById("flipCard");
+    if(flipCard){
+      const doFlip = ()=>{
+        oboeroState.flipped = !oboeroState.flipped;
+        flipCard.classList.toggle("flipped", oboeroState.flipped);
+      };
+      flipCard.addEventListener("click", doFlip);
+      flipCard.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); doFlip(); }});
+      flipCard.setAttribute("tabindex","0");
+      flipCard.setAttribute("role","button");
+      flipCard.setAttribute("aria-label","Flashcard, tap to reveal reading and meaning");
+    }
+
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    if(prevBtn) prevBtn.addEventListener("click", ()=>{
+      if(oboeroState.index > 0){ oboeroState.index--; oboeroState.flipped=false; rerenderOboero(week); }
+    });
+    if(nextBtn) nextBtn.addEventListener("click", ()=>{
+      if(oboeroState.index < oboeroState.cards.length-1){ oboeroState.index++; oboeroState.flipped=false; rerenderOboero(week); }
+    });
+
+    const shuffleBtn = document.getElementById("shuffleBtn");
+    if(shuffleBtn) shuffleBtn.addEventListener("click", ()=>{
+      startOboero(week);
+      rerenderOboero(week);
+    });
+  }
+
+  /* Re-draws the current card without reshuffling the deck. */
+  function rerenderOboero(week){
+    const app = document.getElementById("app");
+    app.innerHTML = renderOboero(week);
+    bindTopNav();
+    bindOboero(week);
   }
 
 })();
