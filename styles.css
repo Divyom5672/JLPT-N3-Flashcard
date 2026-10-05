@@ -292,7 +292,7 @@ button{font-family:inherit; cursor:pointer;}
   margin-top:6px; line-height:1.5; position:relative; z-index:1;
 }
 .cat-card .cat-sub.kanji-peek{
-  font-family:'Shippori Mincho', serif;
+  font-family:'Noto Serif JP', 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', 'MS Mincho', serif;
   font-size:14px; letter-spacing:0.02em; opacity:0.72;
 }
 .cat-card .cat-meta{
@@ -405,7 +405,7 @@ button{font-family:inherit; cursor:pointer;}
 .kanji-list .row:last-child{ border-bottom:none; }
 .kanji-list .row:nth-child(even){ background:rgba(183,69,47,0.035); }
 .kanji-list .k{
-  font-family:'Shippori Mincho', serif; font-size:27px; font-weight:700;
+  font-family:'Noto Serif JP', 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', 'MS Mincho', serif; font-size:27px; font-weight:400;
   white-space:nowrap;
 }
 .kanji-list .mid{ display:flex; flex-direction:column; gap:2px; }
@@ -455,7 +455,7 @@ button{font-family:inherit; cursor:pointer;}
   background:linear-gradient(165deg, var(--washi-soft), var(--washi));
   color:var(--sumi);
 }
-.face-front .kbig{ font-family:'Shippori Mincho', serif; font-size:76px; font-weight:700; }
+.face-front .kbig{ font-family:'Noto Serif JP', 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', 'MS Mincho', serif; font-size:76px; font-weight:400; }
 .face-front .hint{ margin-top:14px; font-size:11.5px; letter-spacing:0.1em; color:var(--ink-soft); opacity:0.55; text-transform:uppercase; }
 .face-back{
   background:linear-gradient(165deg, var(--shu), var(--shu-dark));
@@ -466,7 +466,7 @@ button{font-family:inherit; cursor:pointer;}
 }
 .face-back .hira-big{ font-size:30px; font-weight:600; font-family:'Shippori Mincho', serif; margin-bottom:8px; }
 .face-back .meaning-line{ font-size:15px; opacity:0.92; }
-.face-back .meaning-line .kanji-mini{ display:block; font-size:12px; opacity:0.7; margin-top:10px; letter-spacing:0.04em;}
+.face-back .meaning-line .kanji-mini{ font-family:'Noto Serif JP', 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', 'MS Mincho', serif; display:block; font-size:12px; opacity:0.7; margin-top:10px; letter-spacing:0.04em;}
 
 .flash-nav{
   display:flex; align-items:center; gap:18px;
